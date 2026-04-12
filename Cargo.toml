@@ -1,0 +1,33 @@
+[package]
+name    = "tty2pty-mux"
+version = "0.1.0"
+edition = "2024"
+authors = ["Sven Eckelmann <sven@narfation.org>"]
+description = "serial to multi-pty/telnet muxer"
+license = "GPL-2.0"
+
+[dependencies]
+tokio = { version = "1", features = ["io-util", "macros", "signal", "sync", "rt", "time"] }
+tokio-serial = "5"
+pty-process  = { version = "0.5", features = ["async"] }
+rustix = { version = "1.1.4", features = ["termios"] }
+clap = { version = "4.6.0", features = ["cargo", "derive"] }
+futures = "0.3.32"
+tokio-util = { version = "0.7.18", features = ["codec"] }
+log = { version = "0.4.29", features = ["max_level_debug", "release_max_level_warn"] }
+env_logger = "0.11.10"
+
+[package.metadata.deb]
+depends = "$auto"
+priority = "optional"
+section = "comm"
+license-file = ["LICENSES/GPL-2.0", "18"]
+extended-description = """\
+Multiplexer allowing to access a single serial by multiple terminal emulators \
+via PTY files or telnet. Optionally supporting KGDB interrupt conversion to \
+support easy remote debugging"""
+
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
