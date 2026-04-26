@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wsterm</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="connbar">
+        <div id="status-dot"></div>
+        <span id="status-label">disconnected</span>
+        <input id="input-url" type="text" placeholder="ws://host:port  or  wss://host:port/path" spellcheck="false" />
+        <button id="btn-connect">CONNECT</button>
+      </div>
+
+      <div id="terminal-wrap">
+        <div id="terminal"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

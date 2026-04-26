@@ -1,0 +1,111 @@
+/* SPDX-License-Identifier: MIT */
+
+@import '@xterm/xterm/css/xterm.css';
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green:  #39ff14;
+  --amber:  #ffb000;
+  --red:    #ff4444;
+  --bg:     #0d0d0d;
+  --bar-bg: #161616;
+  --border: #2a2a2a;
+  --text:   #c8c8c8;
+  --muted:  #555;
+  --font:   monospace;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Connection bar */
+#connbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--bar-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#connbar input {
+  background: #111;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 4px 8px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+#connbar input:focus { border-color: var(--green); }
+
+#input-url  { flex: 1; min-width: 0; }
+#input-url::placeholder { color: var(--muted); }
+
+#btn-connect {
+  background: none;
+  border: 1px solid var(--green);
+  border-radius: 4px;
+  color: var(--green);
+  font-family: var(--font);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  padding: 4px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+#btn-connect:hover { background: var(--green); color: #000; }
+#btn-connect.disconnect { border-color: var(--red); color: var(--red); }
+#btn-connect.disconnect:hover { background: var(--red); color: #fff; }
+
+/* status dot */
+#status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+#status-dot.connecting { background: var(--amber); }
+#status-dot.connected  { background: var(--green); }
+#status-dot.error      { background: var(--red); }
+
+#status-label {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+/* Terminal wrapper */
+#terminal-wrap {
+  flex: 1;
+  overflow: hidden;
+  padding: 6px 4px 4px 4px;
+}
+
+#terminal {
+  width: 100%;
+  height: 100%;
+}
+
+/* xterm overrides */
+.xterm { height: 100% !important; }
+.xterm-viewport { overflow-y: auto !important; }
+.xterm-screen  { image-rendering: pixelated; }
