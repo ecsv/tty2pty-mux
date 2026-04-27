@@ -1,6 +1,6 @@
 [package]
 name    = "tty2pty-mux"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Sven Eckelmann <sven@narfation.org>"]
 description = "serial to multi-pty/telnet muxer"
