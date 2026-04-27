@@ -10,6 +10,10 @@ use std::io::{
     self,
 };
 use tokio::{
+    io::{
+        AsyncRead,
+        AsyncWrite,
+    },
     net::{
         TcpListener,
         ToSocketAddrs,
@@ -221,92 +225,108 @@ pub async fn serve<A: ToSocketAddrs>(
             let Ok((socket, client_addr)) = listener.accept().await else {
                 continue;
             };
-            let (socket_rx, socket_tx) = tokio::io::split(socket);
-
-            let mut serial_rx_client = serial_rx.resubscribe();
-            let serial_tx_client = serial_tx.clone();
-
-            // copy from serial to this telnet client
-            tokio::spawn(async move {
-                let codec = TelnetByteCodec::new(interrupt_as_break);
-                let mut frame = Framed::new(socket_tx, codec);
-
-                // switch to binary, single byte without echo by telnet client
-                let _ = frame
-                    .send(TelnetByteEvent::Will(TelnetByteOption::Echo))
-                    .await;
-                let _ = frame
-                    .send(TelnetByteEvent::Will(TelnetByteOption::SuppressGoAhead))
-                    .await;
-                let _ = frame
-                    .send(TelnetByteEvent::Do(TelnetByteOption::SuppressGoAhead))
-                    .await;
-                let _ = frame
-                    .send(TelnetByteEvent::Will(TelnetByteOption::Binary))
-                    .await;
-                let _ = frame
-                    .send(TelnetByteEvent::Do(TelnetByteOption::Binary))
-                    .await;
-
-                loop {
-                    match serial_rx_client.recv().await {
-                        Ok(data) => {
-                            if frame
-                                .send(TelnetByteEvent::Data(Bytes::from(data)))
-                                .await
-                                .is_err()
-                            {
-                                break;
-                            }
-                        }
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            log::warn!("TCP {client_addr}: lagged by {n} messages");
-                        }
-                        Err(broadcast::error::RecvError::Closed) => break,
-                    }
-                }
-            });
-
-            // copy from this telnet client to serial
-            tokio::spawn(async move {
-                let codec = TelnetByteCodec::new(interrupt_as_break);
-                let mut frame = Framed::new(socket_rx, codec);
-
-                // on connect, directly send break + start kgdb
-                if interrupt_as_break {
-                    let _ = queue_gdb_break(&serial_tx_client).await;
-                }
-
-                loop {
-                    match frame.next().await {
-                        Some(Ok(msg)) => match msg {
-                            TelnetByteEvent::Data(buf)
-                                if serial_tx_client
-                                    .send(TtyMsg::Data(buf.to_vec()))
-                                    .await
-                                    .is_err() =>
-                            {
-                                break;
-                            }
-                            TelnetByteEvent::GdbInterrupt
-                                if queue_gdb_break(&serial_tx_client).await.is_err() =>
-                            {
-                                break;
-                            }
-                            TelnetByteEvent::Break
-                                if serial_tx_client.send(TtyMsg::Break).await.is_err() =>
-                            {
-                                break;
-                            }
-                            _ => {}
-                        },
-                        Some(Err(_)) => break,
-                        None => break,
-                    }
-                }
-            });
+            serve_client(
+                &serial_rx,
+                &serial_tx,
+                interrupt_as_break,
+                socket,
+                client_addr,
+            );
         }
     });
 
     Ok(())
+}
+
+fn serve_client<T: AsyncRead + AsyncWrite + Unpin + Send + 'static>(
+    serial_rx: &broadcast::Receiver<Vec<u8>>,
+    serial_tx: &mpsc::Sender<TtyMsg>,
+    interrupt_as_break: bool,
+    socket: T,
+    client_addr: std::net::SocketAddr,
+) {
+    let (socket_rx, socket_tx) = tokio::io::split(socket);
+
+    let mut serial_rx_client = serial_rx.resubscribe();
+    let serial_tx_client = serial_tx.clone();
+
+    // copy from serial to this telnet client
+    tokio::spawn(async move {
+        let codec = TelnetByteCodec::new(interrupt_as_break);
+        let mut frame = Framed::new(socket_tx, codec);
+
+        // switch to binary, single byte without echo by telnet client
+        let _ = frame
+            .send(TelnetByteEvent::Will(TelnetByteOption::Echo))
+            .await;
+        let _ = frame
+            .send(TelnetByteEvent::Will(TelnetByteOption::SuppressGoAhead))
+            .await;
+        let _ = frame
+            .send(TelnetByteEvent::Do(TelnetByteOption::SuppressGoAhead))
+            .await;
+        let _ = frame
+            .send(TelnetByteEvent::Will(TelnetByteOption::Binary))
+            .await;
+        let _ = frame
+            .send(TelnetByteEvent::Do(TelnetByteOption::Binary))
+            .await;
+
+        loop {
+            match serial_rx_client.recv().await {
+                Ok(data) => {
+                    if frame
+                        .send(TelnetByteEvent::Data(Bytes::from(data)))
+                        .await
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    log::warn!("TCP {client_addr}: lagged by {n} messages");
+                }
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
+
+    // copy from this telnet client to serial
+    tokio::spawn(async move {
+        let codec = TelnetByteCodec::new(interrupt_as_break);
+        let mut frame = Framed::new(socket_rx, codec);
+
+        // on connect, directly send break + start kgdb
+        if interrupt_as_break {
+            let _ = queue_gdb_break(&serial_tx_client).await;
+        }
+
+        loop {
+            match frame.next().await {
+                Some(Ok(msg)) => match msg {
+                    TelnetByteEvent::Data(buf)
+                        if serial_tx_client
+                            .send(TtyMsg::Data(buf.to_vec()))
+                            .await
+                            .is_err() =>
+                    {
+                        break;
+                    }
+                    TelnetByteEvent::GdbInterrupt
+                        if queue_gdb_break(&serial_tx_client).await.is_err() =>
+                    {
+                        break;
+                    }
+                    TelnetByteEvent::Break
+                        if serial_tx_client.send(TtyMsg::Break).await.is_err() =>
+                    {
+                        break;
+                    }
+                    _ => {}
+                },
+                Some(Err(_)) => break,
+                None => break,
+            }
+        }
+    });
 }
