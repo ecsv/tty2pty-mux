@@ -280,24 +280,23 @@ pub async fn serve<A: ToSocketAddrs>(
                 loop {
                     match frame.next().await {
                         Some(Ok(msg)) => match msg {
-                            TelnetByteEvent::Data(buf) => {
+                            TelnetByteEvent::Data(buf)
                                 if serial_tx_client
                                     .send(TtyMsg::Data(buf.to_vec()))
                                     .await
-                                    .is_err()
-                                {
-                                    break;
-                                }
+                                    .is_err() =>
+                            {
+                                break;
                             }
-                            TelnetByteEvent::GdbInterrupt => {
-                                if queue_gdb_break(&serial_tx_client).await.is_err() {
-                                    break;
-                                }
+                            TelnetByteEvent::GdbInterrupt
+                                if queue_gdb_break(&serial_tx_client).await.is_err() =>
+                            {
+                                break;
                             }
-                            TelnetByteEvent::Break => {
-                                if serial_tx_client.send(TtyMsg::Break).await.is_err() {
-                                    break;
-                                }
+                            TelnetByteEvent::Break
+                                if serial_tx_client.send(TtyMsg::Break).await.is_err() =>
+                            {
+                                break;
                             }
                             _ => {}
                         },
