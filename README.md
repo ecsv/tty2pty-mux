@@ -147,3 +147,23 @@ gdb-multiarch -iex "set auto-load safe-path scripts/gdb/" -iex "target remote 12
 
 These can be combined with `--telnet` and/or `--pty` for parallel access
 to the console.
+
+
+
+Websocket support
+-----------------
+
+Browsers don't have (normally) direct access to raw TCP sockets. To support
+browser based telnet clients, it is possible to either use tools like
+`websockify` or the native websocket support from tty2pty-mux:
+
+```
+tty2pty-mux --device /dev/%I -b 115200 --ws 127.0.0.1:8001
+```
+
+For quick tests, `websocat` is enough but it is recommended to just a proper
+telnet client:
+
+```
+websocat ws://127.0.0.1:8001/
+```

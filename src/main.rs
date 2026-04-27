@@ -42,6 +42,9 @@ struct Args {
 
     #[arg(short = 'T', long = "telnet-gdb")]
     telnet_gdb: Vec<SocketAddr>,
+
+    #[arg(short, long)]
+    ws: Vec<SocketAddr>,
 }
 
 enum TtyMsg {
@@ -58,11 +61,12 @@ async fn main() -> io::Result<()> {
         && args.pty_gdb.is_empty()
         && args.telnet.is_empty()
         && args.telnet_gdb.is_empty()
+        && args.ws.is_empty()
     {
         Args::command()
             .error(
                 ErrorKind::MissingRequiredArgument,
-                "at least one of --pty, --pty-gdb, --telnet, or --telnet-gdb must be specified",
+                "at least one of --pty, --pty-gdb, --telnet, --telnet-gdb or --ws must be specified",
             )
             .exit();
     }
@@ -92,6 +96,10 @@ async fn main() -> io::Result<()> {
 
     for addr in &args.telnet_gdb {
         telnet::serve(addr, serial_rx.resubscribe(), serial_tx.clone(), true).await?;
+    }
+
+    for addr in &args.ws {
+        telnet::serve_ws(addr, serial_rx.resubscribe(), serial_tx.clone()).await?;
     }
 
     // Wait until serial broken (disconnected) or user send Ctrl-C

@@ -2,6 +2,11 @@
 
 mod commands;
 
+use async_tungstenite::{
+    ByteReader,
+    ByteWriter,
+    tokio::accept_async,
+};
 use futures::{
     StreamExt,
     sink::SinkExt,
@@ -230,6 +235,38 @@ pub async fn serve<A: ToSocketAddrs>(
                 &serial_rx,
                 &serial_tx,
                 interrupt_as_break,
+                socket_rx,
+                socket_tx,
+                client_addr,
+            );
+        }
+    });
+
+    Ok(())
+}
+
+pub async fn serve_ws<A: ToSocketAddrs>(
+    addr: A,
+    serial_rx: broadcast::Receiver<Vec<u8>>,
+    serial_tx: mpsc::Sender<TtyMsg>,
+) -> io::Result<()> {
+    let listener = TcpListener::bind(addr).await?;
+    tokio::spawn(async move {
+        loop {
+            let Ok((socket, client_addr)) = listener.accept().await else {
+                continue;
+            };
+            let Ok(ws) = accept_async(socket).await else {
+                continue;
+            };
+
+            let (tx, rx) = ws.split();
+            let socket_rx = ByteReader::new(rx);
+            let socket_tx = ByteWriter::new(tx);
+            serve_client(
+                &serial_rx,
+                &serial_tx,
+                false,
                 socket_rx,
                 socket_tx,
                 client_addr,
