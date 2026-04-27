@@ -225,11 +225,13 @@ pub async fn serve<A: ToSocketAddrs>(
             let Ok((socket, client_addr)) = listener.accept().await else {
                 continue;
             };
+            let (socket_rx, socket_tx) = tokio::io::split(socket);
             serve_client(
                 &serial_rx,
                 &serial_tx,
                 interrupt_as_break,
-                socket,
+                socket_rx,
+                socket_tx,
                 client_addr,
             );
         }
@@ -238,15 +240,14 @@ pub async fn serve<A: ToSocketAddrs>(
     Ok(())
 }
 
-fn serve_client<T: AsyncRead + AsyncWrite + Unpin + Send + 'static>(
+fn serve_client<R: AsyncRead + Unpin + Send + 'static, W: AsyncWrite + Unpin + Send + 'static>(
     serial_rx: &broadcast::Receiver<Vec<u8>>,
     serial_tx: &mpsc::Sender<TtyMsg>,
     interrupt_as_break: bool,
-    socket: T,
+    socket_rx: R,
+    socket_tx: W,
     client_addr: std::net::SocketAddr,
 ) {
-    let (socket_rx, socket_tx) = tokio::io::split(socket);
-
     let mut serial_rx_client = serial_rx.resubscribe();
     let serial_tx_client = serial_tx.clone();
 
